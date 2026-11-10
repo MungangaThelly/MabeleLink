@@ -47,6 +47,12 @@
       width: 38px;
     }
     .location { color: var(--muted); font-size: 14px; }
+    .auth { align-items: end; display: flex; gap: 8px; }
+    .auth label { font-size: 11px; gap: 3px; }
+    .auth input { min-height: 38px; width: 240px; }
+    .auth button { min-height: 38px; white-space: nowrap; }
+    .auth .secondary { background: #edf2e9; color: var(--green-dark); }
+    .auth .secondary:hover { background: #e2eadb; }
     main { margin: 0 auto; max-width: 1120px; padding: 42px 24px 72px; }
     .intro { align-items: end; display: flex; gap: 24px; justify-content: space-between; }
     .eyebrow { color: var(--green); font-size: 12px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
@@ -76,6 +82,16 @@
     .meta { color: var(--muted); font-size: 13px; margin-top: 5px; }
     .reserve { align-items: center; display: flex; gap: 7px; }
     .reserve input { max-width: 92px; }
+    .reserve input[name="buyer_name"] { max-width: 130px; }
+    .reserve input[name="buyer_contact"] { max-width: 130px; }
+    .operator-panel { margin-top: 24px; padding: 24px; }
+    .operator-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 16px; }
+    .reservation-list { display: grid; gap: 10px; }
+    .reservation { align-items: center; border: 1px solid var(--line); border-radius: 12px; display: flex; gap: 12px; justify-content: space-between; padding: 14px; }
+    .reservation-meta { color: var(--muted); font-size: 13px; }
+    .reservation-actions { display: flex; gap: 8px; }
+    .reservation-actions .cancel { background: #f7ece6; color: #8d3515; }
+    .offline-note { background: #f2f2e9; border-radius: 10px; color: var(--muted); font-size: 13px; margin: 14px 0 0; padding: 11px 12px; }
     input, select {
       background: #fff;
       border: 1px solid #d8dbd1;
@@ -120,6 +136,9 @@
     @media (max-width: 480px) {
       .topbar { padding-left: 16px; padding-right: 16px; }
       .location { font-size: 12px; }
+      .auth { align-items: stretch; flex: 1; flex-wrap: wrap; justify-content: end; }
+      .auth label { flex: 1 1 100%; }
+      .auth input { width: 100%; }
       main { padding-left: 14px; padding-right: 14px; }
       .market { padding: 17px; }
       .listing { align-items: start; grid-template-columns: 1fr; }
@@ -130,7 +149,11 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="brand-mark" aria-hidden="true">M</span><span>MabeleLink</span></div>
-    <div class="location">Pilote · Kongo Central</div>
+    <form class="auth" id="auth-form">
+      <label for="api-token">Clé opérateur<input id="api-token" name="api_token" type="password" autocomplete="current-password" minlength="32" required></label>
+      <button type="submit" id="login-button">Accéder</button>
+      <button type="button" class="secondary" id="logout-button" hidden>Quitter</button>
+    </form>
   </header>
   <main>
     <section class="intro" aria-labelledby="page-title">
@@ -139,7 +162,7 @@
         <h1 id="page-title">Les récoltes disponibles.</h1>
         <p>Consultez les produits proposés et signalez une demande. Les quantités sont mises à jour au fur et à mesure des réservations.</p>
       </div>
-      <div class="status"><span class="dot" aria-hidden="true"></span><span id="connection-status">Connexion au marché…</span></div>
+      <div class="status"><span class="dot" aria-hidden="true"></span><span id="connection-status">Mode opérateur</span></div>
     </section>
 
     <div class="layout">
@@ -152,12 +175,12 @@
         <div class="listing-list" id="listing-list">
           <div class="empty"><strong>Chargement des offres…</strong>Veuillez patienter.</div>
         </div>
-        <footer>Une réservation exprime une demande d’achat. Confirmez les détails avec le producteur avant le transport.</footer>
+        <footer>Une réservation reste en attente jusqu’à validation par un opérateur. En cas de coupure, contactez votre coopérative par téléphone; l’opérateur peut saisir la demande à votre place.</footer>
       </section>
 
       <aside class="panel form-panel">
         <h2>Proposer une récolte</h2>
-        <p>Indiquez ce qui est disponible et où le trouver.</p>
+        <p>Indiquez ce qui est disponible et où le trouver. Hors connexion, le brouillon reste sur cet appareil.</p>
         <form id="listing-form">
           <label>Nom du producteur<input name="farmer_name" autocomplete="name" required maxlength="100" placeholder="Ex. Amina"></label>
           <label>Produit<input name="crop" required maxlength="60" placeholder="Ex. Manioc"></label>
@@ -170,12 +193,24 @@
         </form>
       </aside>
     </div>
+    <section class="panel operator-panel" id="operator-panel" hidden aria-labelledby="reservations-title">
+      <div class="operator-head">
+        <div><h2 id="reservations-title">Demandes à traiter</h2><div class="meta">Confirmez la disponibilité avec le producteur avant validation.</div></div>
+        <button type="button" class="secondary" id="refresh-reservations">Actualiser</button>
+      </div>
+      <div class="reservation-list" id="reservation-list"></div>
+    </section>
   </main>
   <script>
     const listNode = document.querySelector("#listing-list");
     const countNode = document.querySelector("#listing-count");
     const statusNode = document.querySelector("#connection-status");
     const noticeNode = document.querySelector("#notice");
+    const TOKEN_KEY = "mabelelink.operatorToken";
+    const DRAFT_KEY = "mabelelink.listingDraft";
+    const reservationListNode = document.querySelector("#reservation-list");
+    const operatorPanel = document.querySelector("#operator-panel");
+    const listingForm = document.querySelector("#listing-form");
 
     function showNotice(message, isError = false) {
       noticeNode.textContent = message;
@@ -184,18 +219,29 @@
     }
 
     async function api(path, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      if (token) headers.authorization = `Bearer ${token}`;
+      if (options.body) headers["content-type"] = "application/json";
       const response = await fetch(path, {
         ...options,
-        headers: { "content-type": "application/json", ...(options.headers || {}) }
+        headers
       });
       const payload = await response.json();
       if (!response.ok) {
         const messages = {
+          unauthorized: "Invalid or expired operator key.",
+          api_token_not_configured: "The server has no operator key configured.",
           insufficient_quantity: "La quantité demandée dépasse le stock disponible.",
           not_found: "Cette offre n’existe plus. Actualisez la page.",
-          invalid_quantity: "Vérifiez la quantité saisie."
+          invalid_quantity: "Vérifiez la quantité saisie.",
+          invalid_transition: "This request has already been processed.",
+          idempotency_conflict: "This request key was already used for different details."
         };
-        throw new Error(messages[payload.error] || "La demande n’a pas abouti.");
+        const error = new Error(messages[payload.error] || String(payload.error || "request_failed"));
+        error.status = response.status;
+        error.code = payload.error;
+        throw error;
       }
       return payload;
     }
@@ -228,6 +274,22 @@
 
         const reserveForm = document.createElement("form");
         reserveForm.className = "reserve";
+        const buyerName = document.createElement("input");
+        buyerName.id = `reserve-buyer-${listing.id}`;
+        buyerName.name = "buyer_name";
+        buyerName.type = "text";
+        buyerName.maxLength = 120;
+        buyerName.required = true;
+        buyerName.placeholder = "Nom acheteur";
+        buyerName.setAttribute("aria-label", "Nom de l’acheteur");
+        const buyerContact = document.createElement("input");
+        buyerContact.id = `reserve-contact-${listing.id}`;
+        buyerContact.name = "buyer_contact";
+        buyerContact.type = "tel";
+        buyerContact.maxLength = 80;
+        buyerContact.autocomplete = "tel";
+        buyerContact.placeholder = "Téléphone (facultatif)";
+        buyerContact.setAttribute("aria-label", "Téléphone de l’acheteur, facultatif");
         const quantity = document.createElement("input");
         quantity.id = `reserve-quantity-${listing.id}`;
         quantity.name = "quantity";
@@ -241,18 +303,40 @@
         const submit = document.createElement("button");
         submit.type = "submit";
         submit.textContent = "Demander";
-        reserveForm.append(quantity, submit);
+        reserveForm.append(buyerName, buyerContact, quantity, submit);
         reserveForm.addEventListener("submit", async (event) => {
           event.preventDefault();
+          if (!sessionStorage.getItem(TOKEN_KEY)) {
+            showNotice("Connectez-vous avec la clé opérateur pour saisir la demande.", true);
+            return;
+          }
+          if (!navigator.onLine) {
+            showNotice("Demande non envoyée. Appelez la coopérative ou l’opérateur pour la faire saisir.", true);
+            return;
+          }
           submit.disabled = true;
+          const keyName = `mabelelink.reservationKey.${listing.id}`;
+          let requestKey = sessionStorage.getItem(keyName);
+          if (!requestKey) {
+            requestKey = newRequestKey();
+            sessionStorage.setItem(keyName, requestKey);
+          }
           try {
             await api(`/api/v1/listings/${listing.id}/reservations`, {
               method: "POST",
-              body: JSON.stringify({ quantity: Number(quantity.value) })
+              headers: { "idempotency-key": requestKey },
+              body: JSON.stringify({
+                quantity: Number(quantity.value),
+                buyer_name: buyerName.value.trim(),
+                buyer_contact: buyerContact.value.trim()
+              })
             });
+            sessionStorage.removeItem(keyName);
             showNotice("Demande enregistrée et quantité actualisée.");
-            await loadListings();
+            await Promise.all([loadListings(), loadReservations()]);
           } catch (error) {
+            if (error.code === "idempotency_conflict") sessionStorage.removeItem(keyName);
+            if (error.status === 401) logout(false);
             showNotice(error.message, true);
           } finally {
             submit.disabled = false;
@@ -264,18 +348,145 @@
     }
 
     async function loadListings() {
+      if (!sessionStorage.getItem(TOKEN_KEY)) {
+        statusNode.textContent = "Clé opérateur requise";
+        const empty = textNode("div", "empty", "");
+        empty.append(textNode("strong", "", "Connexion opérateur requise"));
+        empty.append(document.createTextNode("Les offres et les demandes sont réservées aux opérateurs autorisés."));
+        listNode.replaceChildren(empty);
+        return;
+      }
+      if (!navigator.onLine) {
+        statusNode.textContent = "Hors connexion";
+        const empty = textNode("div", "empty", "");
+        empty.append(textNode("strong", "", "Marché hors connexion"));
+        empty.append(document.createTextNode("Les brouillons restent enregistrés sur cet appareil. Pour une demande, contactez la coopérative."));
+        listNode.replaceChildren(empty);
+        return;
+      }
       try {
         const listings = await api("/api/v1/listings");
         renderListings(listings);
         statusNode.textContent = "Marché connecté";
-      } catch (_error) {
+      } catch (error) {
+        if (error.status === 401) logout(false);
         statusNode.textContent = "Marché indisponible";
         listNode.replaceChildren(textNode("div", "empty", "Impossible de charger les offres. Vérifiez que le serveur est démarré puis actualisez la page."));
       }
     }
 
+    async function loadReservations() {
+      if (!sessionStorage.getItem(TOKEN_KEY) || !navigator.onLine) return;
+      try {
+        const reservations = await api("/api/v1/reservations");
+        reservationListNode.replaceChildren();
+        const pending = reservations.filter((reservation) => reservation.status === "pending");
+        if (!pending.length) {
+          reservationListNode.append(textNode("div", "empty", "Aucune demande en attente."));
+          return;
+        }
+        pending.forEach((reservation) => {
+          const row = textNode("article", "reservation", "");
+          const details = textNode("div", "", "");
+          details.append(textNode("strong", "", `${reservation.buyer_name || "Acheteur"} · ${reservation.quantity} · offre #${reservation.listing_id}`));
+          details.append(textNode("div", "reservation-meta", `Demande #${reservation.id} · En attente de confirmation`));
+          if (reservation.buyer_contact) {
+            details.append(textNode("div", "reservation-meta", `Contact: ${reservation.buyer_contact}`));
+          }
+          const actions = textNode("div", "reservation-actions", "");
+          for (const [action, label] of [["confirm", "Confirmer"], ["cancel", "Annuler"]]) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = label;
+            if (action === "cancel") button.className = "cancel";
+            button.addEventListener("click", async () => {
+              button.disabled = true;
+              try {
+                await api(`/api/v1/reservations/${reservation.id}/${action}`, { method: "POST" });
+                showNotice(action === "confirm" ? "Demande confirmée." : "Demande annulée; le stock est rétabli.");
+                await Promise.all([loadListings(), loadReservations()]);
+              } catch (error) {
+                if (error.status === 401) logout(false);
+                showNotice(error.message, true);
+              } finally {
+                button.disabled = false;
+              }
+            });
+            actions.append(button);
+          }
+          row.append(details, actions);
+          reservationListNode.append(row);
+        });
+      } catch (error) {
+        if (error.status === 401) logout(false);
+        showNotice(error.message, true);
+      }
+    }
+
+    function saveDraft() {
+      try {
+        const draft = Object.fromEntries(new FormData(listingForm).entries());
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch (_error) {
+        showNotice("Le navigateur ne peut pas garder ce brouillon localement.", true);
+      }
+    }
+
+    function restoreDraft() {
+      try {
+        const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}");
+        for (const [name, value] of Object.entries(draft)) {
+          const field = listingForm.elements.namedItem(name);
+          if (field) field.value = value;
+        }
+      } catch (_error) {
+        try { localStorage.removeItem(DRAFT_KEY); } catch (_storageError) {}
+      }
+    }
+
+    function newRequestKey() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    listingForm.addEventListener("input", saveDraft);
+    restoreDraft();
+    document.querySelector("#auth-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      sessionStorage.setItem(TOKEN_KEY, document.querySelector("#api-token").value);
+      try {
+        await api("/api/v1/listings");
+        document.querySelector("#login-button").hidden = true;
+        document.querySelector("#logout-button").hidden = false;
+        operatorPanel.hidden = false;
+        showNotice("Accès opérateur autorisé.");
+        await Promise.all([loadListings(), loadReservations()]);
+      } catch (error) {
+        logout(false);
+        showNotice(error.message, true);
+      }
+    });
+    document.querySelector("#logout-button").addEventListener("click", () => logout());
+    document.querySelector("#refresh-reservations").addEventListener("click", loadReservations);
+
+    function logout(showMessage = true) {
+      sessionStorage.removeItem(TOKEN_KEY);
+      document.querySelector("#api-token").value = "";
+      document.querySelector("#login-button").hidden = false;
+      document.querySelector("#logout-button").hidden = true;
+      operatorPanel.hidden = true;
+      if (showMessage) showNotice("Session opérateur terminée.");
+      loadListings();
+    }
+
     document.querySelector("#listing-form").addEventListener("submit", async (event) => {
       event.preventDefault();
+      saveDraft();
+      if (!navigator.onLine || !sessionStorage.getItem(TOKEN_KEY)) {
+        showNotice("Brouillon conservé sur cet appareil. Connectez-vous pour publier ou appelez la coopérative pour une saisie assistée.", true);
+        return;
+      }
       const form = event.currentTarget;
       const values = new FormData(form);
       const submit = form.querySelector("button[type=submit]");
@@ -285,6 +496,7 @@
       try {
         await api("/api/v1/listings", { method: "POST", body: JSON.stringify(listing) });
         form.reset();
+        localStorage.removeItem(DRAFT_KEY);
         showNotice("Votre offre est publiée.");
         await loadListings();
       } catch (error) {
@@ -294,7 +506,24 @@
       }
     });
 
-    loadListings();
+    window.addEventListener("offline", () => {
+      statusNode.textContent = "Hors connexion · brouillon local disponible";
+    });
+    window.addEventListener("online", () => {
+      showNotice("Connexion rétablie. Vérifiez le brouillon puis publiez-le.");
+      loadListings();
+      loadReservations();
+    });
+    document.querySelector("#logout-button").hidden = true;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+    }
+    if (sessionStorage.getItem(TOKEN_KEY)) {
+      document.querySelector("#api-token").value = sessionStorage.getItem(TOKEN_KEY);
+      document.querySelector("#auth-form").requestSubmit();
+    } else {
+      loadListings();
+    }
   </script>
 </body>
 </html>

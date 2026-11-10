@@ -8,29 +8,60 @@
 init(Req, health) ->
     respond(200, #{status => <<"ok">>}, Req);
 init(Req, listings) ->
-    handle_listings(cowboy_req:method(Req), Req);
+    authenticated(Req, fun(AuthorizedReq) ->
+        handle_listings(cowboy_req:method(AuthorizedReq), AuthorizedReq)
+    end);
 init(Req, listing) ->
-    handle_listing(cowboy_req:method(Req), cowboy_req:binding(id, Req), Req);
+    authenticated(Req, fun(AuthorizedReq) ->
+        handle_listing(cowboy_req:method(AuthorizedReq),
+                       cowboy_req:binding(id, AuthorizedReq), AuthorizedReq)
+    end);
 init(Req, reservation) ->
-    handle_reservation(cowboy_req:method(Req), cowboy_req:binding(id, Req), Req).
+    authenticated(Req, fun(AuthorizedReq) ->
+        handle_reservation(cowboy_req:method(AuthorizedReq),
+                           cowboy_req:binding(id, AuthorizedReq), AuthorizedReq)
+    end);
+init(Req, reservations) ->
+    authenticated(Req, fun(AuthorizedReq) ->
+        handle_reservations(cowboy_req:method(AuthorizedReq), AuthorizedReq)
+    end);
+init(Req, {reservation_action, Action}) ->
+    authenticated(Req, fun(AuthorizedReq) ->
+        handle_reservation_action(cowboy_req:method(AuthorizedReq), Action,
+                                  cowboy_req:binding(id, AuthorizedReq), AuthorizedReq)
+    end);
+init(Req, audit_events) ->
+    authenticated(Req, fun(AuthorizedReq) ->
+        handle_audit_events(cowboy_req:method(AuthorizedReq), AuthorizedReq)
+    end).
+
+authenticated(Req, Action) ->
+    case mabelelink_auth:check(Req) of
+        ok -> Action(Req);
+        {error, unconfigured} ->
+            respond(503, #{error => <<"api_token_not_configured">>}, Req);
+        {error, unauthorized} ->
+            Req1 = cowboy_req:reply(401,
+                #{<<"content-type">> => <<"application/json; charset=utf-8">>,
+                  <<"www-authenticate">> => <<"Bearer">>},
+                jsx:encode(#{error => <<"unauthorized">>}), Req),
+            {ok, Req1, undefined}
+    end.
 
 handle_listings(<<"GET">>, Req) ->
     {ok, Listings} = mabelelink_listings:list(),
     respond(200, Listings, Req);
 handle_listings(<<"POST">>, Req) ->
     with_json_body(Req, fun(Body, Req1) ->
-        case listing_attributes(Body) of
-            {ok, Attributes} ->
-                case mabelelink_listings:create(Attributes) of
-                    {ok, Listing} -> respond(201, Listing, Req1);
-                    {error, {missing_fields, Missing}} ->
-                        respond(400, #{error => <<"missing_fields">>, fields => Missing}, Req1);
-                    {error, invalid_quantity} ->
-                        respond(400, #{error => <<"invalid_quantity">>}, Req1);
-                    {error, {storage_write_failed, _}} ->
-                        respond(500, #{error => <<"storage_failure">>}, Req1)
-                end;
-            error -> respond(400, #{error => <<"invalid_listing">>}, Req1)
+        Attributes = listing_attributes(Body),
+        case mabelelink_listings:create(Attributes) of
+            {ok, Listing} -> respond(201, Listing, Req1);
+            {error, {missing_fields, Missing}} ->
+                respond(400, #{error => <<"missing_fields">>, fields => Missing}, Req1);
+            {error, invalid_listing} ->
+                respond(400, #{error => <<"invalid_listing">>}, Req1);
+            {error, {storage_write_failed, _}} ->
+                respond(500, #{error => <<"storage_failure">>}, Req1)
         end
     end);
 handle_listings(_Method, Req) ->
@@ -52,23 +83,66 @@ handle_reservation(<<"POST">>, IdBin, Req) ->
     case parse_id(IdBin) of
         {ok, Id} ->
             with_json_body(Req, fun(Body, Req1) ->
-                case maps:get(<<"quantity">>, Body, undefined) of
-                    Quantity when is_number(Quantity), Quantity > 0 ->
-                        case mabelelink_listings:reserve(Id, Quantity) of
-                            {ok, Reservation} -> respond(201, Reservation, Req1);
+                Quantity = maps:get(<<"quantity">>, Body, undefined),
+                BuyerName = maps:get(<<"buyer_name">>, Body, undefined),
+                Contact = maps:get(<<"buyer_contact">>, Body, undefined),
+                case valid_buyer(BuyerName, Contact) andalso
+                     is_number(Quantity) andalso Quantity > 0 of
+                    true ->
+                        Buyer = #{buyer_name => BuyerName,
+                                  buyer_contact => optional_binary(Contact)},
+                        RequestKey = cowboy_req:header(<<"idempotency-key">>, Req1),
+                        case mabelelink_listings:reserve(Id, Quantity, Buyer, RequestKey) of
+                            {ok, Reservation} ->
+                                respond(201, Reservation, Req1);
                             {error, not_found} ->
                                 respond(404, #{error => <<"not_found">>}, Req1);
                             {error, insufficient_quantity} ->
                                 respond(409, #{error => <<"insufficient_quantity">>}, Req1);
+                            {error, idempotency_conflict} ->
+                                respond(409, #{error => <<"idempotency_conflict">>}, Req1);
                             {error, {storage_write_failed, _}} ->
                                 respond(500, #{error => <<"storage_failure">>}, Req1)
                         end;
-                    _ -> respond(400, #{error => <<"invalid_quantity">>}, Req1)
+                    false ->
+                        respond(400, #{error => <<"invalid_reservation">>}, Req1)
                 end
             end);
         error -> respond(400, #{error => <<"invalid_id">>}, Req)
     end;
 handle_reservation(_Method, _IdBin, Req) ->
+    respond(405, #{error => <<"method_not_allowed">>}, Req).
+
+handle_reservations(<<"GET">>, Req) ->
+    {ok, Reservations} = mabelelink_listings:reservations(),
+    respond(200, Reservations, Req);
+handle_reservations(_Method, Req) ->
+    respond(405, #{error => <<"method_not_allowed">>}, Req).
+
+handle_reservation_action(<<"POST">>, Action, IdBin, Req) ->
+    case parse_id(IdBin) of
+        {ok, Id} ->
+            Result = case Action of
+                         confirm -> mabelelink_listings:confirm_reservation(Id);
+                         cancel -> mabelelink_listings:cancel_reservation(Id)
+                     end,
+            case Result of
+                {ok, Reservation} -> respond(200, Reservation, Req);
+                {error, not_found} -> respond(404, #{error => <<"not_found">>}, Req);
+                {error, invalid_transition} ->
+                    respond(409, #{error => <<"invalid_transition">>}, Req);
+                {error, {storage_write_failed, _}} ->
+                    respond(500, #{error => <<"storage_failure">>}, Req)
+            end;
+        error -> respond(400, #{error => <<"invalid_id">>}, Req)
+    end;
+handle_reservation_action(_Method, _Action, _IdBin, Req) ->
+    respond(405, #{error => <<"method_not_allowed">>}, Req).
+
+handle_audit_events(<<"GET">>, Req) ->
+    {ok, Events} = mabelelink_listings:audit_events(),
+    respond(200, Events, Req);
+handle_audit_events(_Method, Req) ->
     respond(405, #{error => <<"method_not_allowed">>}, Req).
 
 with_json_body(Req, Fun) ->
@@ -86,14 +160,21 @@ with_json_body(Req, Fun) ->
 
 listing_attributes(Body) ->
     Allowed = [farmer_name, crop, quantity, unit, location, notes],
-    Attributes = lists:foldl(fun(Key, Acc) ->
+    lists:foldl(fun(Key, Acc) ->
         JsonKey = atom_to_binary(Key, utf8),
         case maps:find(JsonKey, Body) of
             {ok, Value} -> maps:put(Key, Value, Acc);
             error -> Acc
         end
-    end, #{}, Allowed),
-    {ok, Attributes}.
+    end, #{}, Allowed).
+
+valid_buyer(Name, Contact) ->
+    is_binary(Name) andalso byte_size(Name) > 0 andalso byte_size(Name) =< 120 andalso
+    (Contact =:= undefined orelse Contact =:= <<>> orelse
+     (is_binary(Contact) andalso byte_size(Contact) > 0 andalso byte_size(Contact) =< 80)).
+
+optional_binary(undefined) -> <<>>;
+optional_binary(Value) -> Value.
 
 parse_id(undefined) -> error;
 parse_id(IdBin) ->
