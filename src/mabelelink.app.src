@@ -1,8 +1,9 @@
 {application, mabelelink,
  [{description, "MabeleLink agricultural coordination MVP"},
   {vsn, "0.1.0"},
-  {registered, [mabelelink_sup, mabelelink_listings]},
+  {registered, [mabelelink_sup, mabelelink_listings, mabelelink_http]},
   {mod, {mabelelink_app, []}},
-  {applications, [kernel, stdlib]},
-  {env, []},
-  {modules, [mabelelink_app, mabelelink_sup, mabelelink_listings]}]}.
+  {applications, [kernel, stdlib, cowboy, jsx]},
+  {env, [{http_port, 8080}]},
+  {modules, [mabelelink_app, mabelelink_sup, mabelelink_listings,
+             mabelelink_http, mabelelink_http_handler]}]}.

@@ -13,4 +13,10 @@ init([]) ->
                  shutdown => 5000,
                  type => worker,
                  modules => [mabelelink_listings]},
-    {ok, {{one_for_one, 5, 10}, [Listings]}}.
+    Http = #{id => mabelelink_http,
+             start => {mabelelink_http, start_link, []},
+             restart => permanent,
+             shutdown => 5000,
+             type => worker,
+             modules => [mabelelink_http]},
+    {ok, {{one_for_one, 5, 10}, [Listings, Http]}}.

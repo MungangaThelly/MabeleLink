@@ -12,10 +12,11 @@ quantity while the service prevents over-reservation.
 - Listing validation for farmer, crop, quantity, unit, and location.
 - Browse and fetch listings.
 - Atomic quantity reservations within the running Erlang process.
+- Versioned JSON HTTP API for listings, reservations, and health checks.
 
 This is a backend foundation, not yet a deployable marketplace. The local DETS
-file is suitable only for a single-node prototype; there is no HTTP interface,
-authentication, payment, or transport integration yet.
+file is suitable only for a single-node prototype. The API has no authentication,
+payment, or transport integration yet.
 
 ## Run
 
@@ -24,6 +25,41 @@ Requires Erlang/OTP and rebar3.
 ```powershell
 rebar3 shell
 ```
+
+Run the EUnit suite with:
+
+```powershell
+rebar3 eunit
+```
+
+The HTTP API listens on port `8080` by default. Set the `http_port` application
+environment value to change it. Available endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/healthz` | Health check |
+| `GET` | `/api/v1/listings` | Browse listings |
+| `POST` | `/api/v1/listings` | Create a produce listing |
+| `GET` | `/api/v1/listings/:id` | Fetch one listing |
+| `POST` | `/api/v1/listings/:id/reservations` | Request a quantity reservation |
+
+Create a listing with JSON:
+
+```json
+{
+  "farmer_name": "Amina",
+  "crop": "cassava",
+  "quantity": 500,
+  "unit": "kg",
+  "location": "Kongo Central"
+}
+```
+
+Reserve quantity with `POST /api/v1/listings/1/reservations` and body
+`{"quantity":100}`. Reservations currently decrement available stock
+immediately; they do not yet have a separate confirmation, cancellation, or
+expiry lifecycle. The API has no authentication and should only be used in a
+trusted local development environment.
 
 In the Erlang shell:
 
@@ -91,14 +127,14 @@ to transport, storage, and payments.
   integration until local partner and settlement processes are verified.
 - Use minimal personal data, role-based access, and explicit consent before
   exposing phone numbers or sharing a buyer request.
-- The current in-memory service is for the first development slice only; add
-  durable storage and a transaction/audit model before any field deployment.
+- DETS is a local single-node store; add a transaction/audit model and migrate
+  to PostgreSQL before a multi-user field deployment.
 
 ## Next engineering increments
 
 1. Add EUnit coverage for validation, reservations, and concurrent buyers.
 2. Add reservation history and move multi-user deployments to PostgreSQL.
-3. Expose a versioned HTTP API and operator authentication.
+3. Add operator authentication and a reservation confirmation/cancellation lifecycle.
 4. Add an offline-capable field client and an SMS-assisted fallback.
 5. Pilot with a named cooperative and buyer group; revise the workflow from
    observed transactions.
