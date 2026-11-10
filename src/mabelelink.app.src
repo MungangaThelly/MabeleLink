@@ -1,0 +1,8 @@
+{application, mabelelink,
+ [{description, "MabeleLink agricultural coordination MVP"},
+  {vsn, "0.1.0"},
+  {registered, [mabelelink_sup, mabelelink_listings]},
+  {mod, {mabelelink_app, []}},
+  {applications, [kernel, stdlib]},
+  {env, []},
+  {modules, [mabelelink_app, mabelelink_sup, mabelelink_listings]}]}.
