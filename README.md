@@ -32,8 +32,9 @@ Run the EUnit suite with:
 rebar3 eunit
 ```
 
-The HTTP API listens on port `8080` by default. Set the `http_port` application
-environment value to change it. Available endpoints:
+Open `http://localhost:8080/` to use the browser interface. The HTTP API listens
+on port `8080` by default; set the `http_port` application environment value to
+change it. Available API endpoints:
 
 | Method | Path | Purpose |
 |---|---|---|

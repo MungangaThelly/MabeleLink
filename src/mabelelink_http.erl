@@ -17,6 +17,8 @@ init([]) ->
                undefined -> 8080
            end,
     Routes = [{'_', [
+        {"/", cowboy_static, {priv_file, mabelelink, "index.html"}},
+        {"/favicon.svg", cowboy_static, {priv_file, mabelelink, "favicon.svg"}},
         {"/healthz", mabelelink_http_handler, health},
         {"/api/v1/listings", mabelelink_http_handler, listings},
         {"/api/v1/listings/:id", mabelelink_http_handler, listing},
