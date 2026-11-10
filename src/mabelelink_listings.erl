@@ -1,8 +1,8 @@
 -module(mabelelink_listings).
 -behaviour(gen_server).
 
-%% In-memory listing and reservation service. Persistence and authentication
-%% are intentionally left for the next MVP increment.
+%% DETS-backed listing and reservation service. Authentication is not yet
+%% implemented; this service is for local MVP development only.
 -export([start_link/0, create/1, list/0, get/1, reserve/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
@@ -27,7 +27,20 @@ reserve(_Id, _Quantity) ->
     {error, invalid_quantity}.
 
 init([]) ->
-    {ok, #{listings => #{}, next_id => 1}}.
+    Path = data_file(),
+    ok = filelib:ensure_dir(Path),
+    case dets:open_file(?SERVER, [{file, Path}, {type, set}]) of
+        {ok, ?SERVER} ->
+            Listings = maps:from_list(
+                         listing_pairs(dets:match_object(?SERVER, {'_', '_'}))),
+            NextId = case maps:keys(Listings) of
+                         [] -> 1;
+                         Ids -> lists:max(Ids) + 1
+                     end,
+            {ok, #{listings => Listings, next_id => NextId}};
+        {error, Reason} ->
+            {stop, {storage_open_failed, Reason}}
+    end.
 
 handle_call({create, Attributes}, _From, State) ->
     case validate_listing(Attributes) of
@@ -35,7 +48,12 @@ handle_call({create, Attributes}, _From, State) ->
             Id = maps:get(next_id, State),
             Stored = Listing#{id => Id, available_quantity => maps:get(quantity, Listing)},
             Listings = maps:put(Id, Stored, maps:get(listings, State)),
-            {reply, {ok, Stored}, State#{listings => Listings, next_id => Id + 1}};
+            case persist(Stored) of
+                ok ->
+                    {reply, {ok, Stored}, State#{listings => Listings, next_id => Id + 1}};
+                {error, Reason} ->
+                    {reply, {error, {storage_write_failed, Reason}}, State}
+            end;
         Error ->
             {reply, Error, State}
     end;
@@ -60,8 +78,13 @@ handle_call({reserve, Id, Quantity}, _From, State) ->
                     {reply, {error, insufficient_quantity}, State};
                 true ->
                     Updated = Listing#{available_quantity => Available - Quantity},
-                    {reply, {ok, #{listing => Updated, reserved_quantity => Quantity}},
-                     State#{listings => maps:put(Id, Updated, Listings)}}
+                    case persist(Updated) of
+                        ok ->
+                            {reply, {ok, #{listing => Updated, reserved_quantity => Quantity}},
+                             State#{listings => maps:put(Id, Updated, Listings)}};
+                        {error, Reason} ->
+                            {reply, {error, {storage_write_failed, Reason}}, State}
+                    end
             end
     end;
 handle_call(_Request, _From, State) ->
@@ -74,6 +97,7 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
+    dets:close(?SERVER),
     ok.
 
 code_change(_OldVersion, State, _Extra) ->
@@ -94,3 +118,19 @@ validate_listing(Attributes) ->
         _ ->
             {error, {missing_fields, Missing}}
     end.
+
+data_file() ->
+    case application:get_env(mabelelink, data_file) of
+        {ok, Path} -> Path;
+        undefined -> filename:join(["data", "mabelelink.dets"])
+    end.
+
+persist(Listing) ->
+    Id = maps:get(id, Listing),
+    case dets:insert(?SERVER, {Id, Listing}) of
+        ok -> dets:sync(?SERVER);
+        Error -> Error
+    end.
+
+listing_pairs(Objects) ->
+    [{Id, Listing} || {Id, Listing} <- Objects].

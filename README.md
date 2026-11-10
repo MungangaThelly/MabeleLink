@@ -8,14 +8,14 @@ quantity while the service prevents over-reservation.
 ## Current MVP slice
 
 - OTP application and supervision tree.
-- In-memory produce listing service.
+- DETS-backed produce listing service (survives normal application restarts).
 - Listing validation for farmer, crop, quantity, unit, and location.
 - Browse and fetch listings.
 - Atomic quantity reservations within the running Erlang process.
 
-This is a backend foundation, not yet a deployable marketplace: state is lost
-when the process stops, and there is no HTTP interface, authentication, payment,
-or transport integration yet.
+This is a backend foundation, not yet a deployable marketplace. The local DETS
+file is suitable only for a single-node prototype; there is no HTTP interface,
+authentication, payment, or transport integration yet.
 
 ## Run
 
@@ -97,7 +97,7 @@ to transport, storage, and payments.
 ## Next engineering increments
 
 1. Add EUnit coverage for validation, reservations, and concurrent buyers.
-2. Add PostgreSQL persistence and reservation history.
+2. Add reservation history and move multi-user deployments to PostgreSQL.
 3. Expose a versioned HTTP API and operator authentication.
 4. Add an offline-capable field client and an SMS-assisted fallback.
 5. Pilot with a named cooperative and buyer group; revise the workflow from
