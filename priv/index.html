@@ -153,8 +153,7 @@
 
     function showNotice(message, isError = false) {
       noticeNode.textContent = message;
-      noticeNode.className = 
-otice show ${isError ? "error" : "success"}`;
+      noticeNode.className = `notice show ${isError ? "error" : "success"}`;
       window.setTimeout(() => noticeNode.classList.remove("show"), 4500);
     }
 
