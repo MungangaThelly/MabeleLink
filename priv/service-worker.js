@@ -1,4 +1,4 @@
-const CACHE_NAME = "mabelelink-shell-v1";
+const CACHE_NAME = "mabelelink-shell-v2";
 const SHELL_FILES = ["/", "/favicon.svg"];
 
 self.addEventListener("install", (event) => {

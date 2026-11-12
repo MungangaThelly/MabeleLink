@@ -3,151 +3,88 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f3ec">
+  <meta name="theme-color" content="#00436a">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <title>MabeleLink — Marché agricole</title>
   <style>
-    :root {
-      color-scheme: light;
-      --ink: #20251d;
-      --muted: #697064;
-      --paper: #f5f3ec;
-      --surface: #fffefa;
-      --green: #315f3d;
-      --green-dark: #244b30;
-      --line: #e4e4d9;
-      --orange: #dc7b42;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--paper);
-      color: var(--ink);
-      font: 16px/1.5 "Segoe UI", system-ui, sans-serif;
-    }
-    button, input, select { font: inherit; }
-    .topbar {
-      align-items: center;
-      background: var(--surface);
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      padding: 16px max(24px, calc((100vw - 1120px) / 2));
-    }
-    .brand { align-items: center; display: flex; gap: 11px; font-weight: 750; }
-    .brand-mark {
-      align-items: center;
-      background: var(--green);
-      border-radius: 12px;
-      color: white;
-      display: flex;
-      font-size: 19px;
-      height: 38px;
-      justify-content: center;
-      width: 38px;
-    }
-    .location { color: var(--muted); font-size: 14px; }
-    .auth { align-items: end; display: flex; gap: 8px; }
-    .auth label { font-size: 11px; gap: 3px; }
-    .auth input { min-height: 38px; width: 240px; }
-    .auth button { min-height: 38px; white-space: nowrap; }
-    .auth .secondary { background: #edf2e9; color: var(--green-dark); }
-    .auth .secondary:hover { background: #e2eadb; }
-    main { margin: 0 auto; max-width: 1120px; padding: 42px 24px 72px; }
-    .intro { align-items: end; display: flex; gap: 24px; justify-content: space-between; }
-    .eyebrow { color: var(--green); font-size: 12px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
-    h1 { font-size: clamp(32px, 5vw, 48px); letter-spacing: -.04em; line-height: 1.08; margin: 10px 0 12px; }
-    .intro p { color: var(--muted); margin: 0; max-width: 600px; }
-    .status { align-items: center; color: var(--muted); display: flex; flex: 0 0 auto; font-size: 13px; gap: 8px; }
-    .dot { background: #47985b; border-radius: 99px; height: 8px; width: 8px; }
-    .layout { display: grid; gap: 24px; grid-template-columns: minmax(0, 1.7fr) minmax(290px, .9fr); margin-top: 34px; }
-    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
-    .market { min-width: 0; padding: 24px; }
-    .panel-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 20px; }
-    h2 { font-size: 19px; letter-spacing: -.02em; margin: 0; }
-    .count { background: #edf2e9; border-radius: 99px; color: var(--green); font-size: 12px; font-weight: 700; padding: 5px 10px; }
-    .listing-list { display: grid; gap: 12px; }
-    .listing {
-      align-items: center;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      display: grid;
-      gap: 18px;
-      grid-template-columns: minmax(0, 1fr) auto;
-      padding: 17px;
-    }
-    .crop-line { align-items: baseline; display: flex; flex-wrap: wrap; gap: 9px; }
-    .crop { font-size: 17px; font-weight: 720; text-transform: capitalize; }
-    .qty { color: var(--green); font-size: 14px; font-weight: 700; }
-    .meta { color: var(--muted); font-size: 13px; margin-top: 5px; }
-    .reserve { align-items: center; display: flex; gap: 7px; }
-    .reserve input { max-width: 92px; }
-    .reserve input[name="buyer_name"] { max-width: 130px; }
-    .reserve input[name="buyer_contact"] { max-width: 130px; }
-    .operator-panel { margin-top: 24px; padding: 24px; }
-    .operator-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 16px; }
-    .reservation-list { display: grid; gap: 10px; }
-    .reservation { align-items: center; border: 1px solid var(--line); border-radius: 12px; display: flex; gap: 12px; justify-content: space-between; padding: 14px; }
-    .reservation-meta { color: var(--muted); font-size: 13px; }
-    .reservation-actions { display: flex; gap: 8px; }
-    .reservation-actions .cancel { background: #f7ece6; color: #8d3515; }
-    .offline-note { background: #f2f2e9; border-radius: 10px; color: var(--muted); font-size: 13px; margin: 14px 0 0; padding: 11px 12px; }
-    input, select {
-      background: #fff;
-      border: 1px solid #d8dbd1;
-      border-radius: 9px;
-      color: var(--ink);
-      min-height: 42px;
-      padding: 9px 11px;
-      width: 100%;
-    }
-    input:focus, select:focus { border-color: var(--green); outline: 3px solid #315f3d22; }
-    button {
-      background: var(--green);
-      border: 0;
-      border-radius: 9px;
-      color: white;
-      cursor: pointer;
-      font-weight: 680;
-      min-height: 42px;
-      padding: 9px 14px;
-    }
-    button:hover { background: var(--green-dark); }
-    button:disabled { cursor: wait; opacity: .65; }
-    .form-panel { align-self: start; padding: 23px; }
-    .form-panel p { color: var(--muted); font-size: 14px; margin: 7px 0 20px; }
-    form { display: grid; gap: 14px; }
-    label { color: #42483e; display: grid; font-size: 13px; font-weight: 650; gap: 6px; }
-    .two-col { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
-    .submit { margin-top: 3px; width: 100%; }
-    .empty { border: 1px dashed #cdd2c6; border-radius: 13px; color: var(--muted); padding: 28px 18px; text-align: center; }
-    .empty strong { color: var(--ink); display: block; margin-bottom: 4px; }
-    .notice { border-radius: 10px; display: none; font-size: 14px; margin-bottom: 16px; padding: 10px 12px; }
-    .notice.show { display: block; }
-    .notice.error { background: #fff0e9; color: #8d3515; }
-    .notice.success { background: #edf5e9; color: #315f3d; }
-    footer { color: var(--muted); font-size: 12px; margin: 22px 2px 0; }
-    @media (max-width: 760px) {
-      main { padding-top: 30px; }
-      .layout { grid-template-columns: 1fr; }
-      .intro { align-items: start; flex-direction: column; }
-      .status { padding-top: 0; }
-    }
-    @media (max-width: 480px) {
-      .topbar { padding-left: 16px; padding-right: 16px; }
-      .location { font-size: 12px; }
-      .auth { align-items: stretch; flex: 1; flex-wrap: wrap; justify-content: end; }
-      .auth label { flex: 1 1 100%; }
-      .auth input { width: 100%; }
-      main { padding-left: 14px; padding-right: 14px; }
-      .market { padding: 17px; }
-      .listing { align-items: start; grid-template-columns: 1fr; }
-      .reserve { justify-content: start; }
-    }
-  </style>
-</head>
+    :root { color-scheme: light; --ink:#171717; --muted:#505a61; --paper:#f1f1f1; --surface:#fff; --blue:#005a9c; --navy:#00436a; --line:#c9cdd0; --pale:#d9efff; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.55 "Segoe UI",Arial,sans-serif; }
+    button,input,select { font:inherit; }
+    .topbar { align-items:center; background:var(--surface); border-bottom:1px solid var(--line); display:grid; gap:8px 28px; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); margin:auto; max-width:1290px; min-height:112px; padding:16px 32px; }
+    .brand { align-items:center; display:flex; gap:11px; font-size:21px; font-weight:700; }
+    .brand-mark { align-items:center; background:var(--navy); color:#fff; display:flex; font-size:20px; height:44px; justify-content:center; width:44px; }
+    .top-links { color:var(--blue); display:flex; flex-wrap:wrap; font-size:13px; gap:4px 22px; grid-column:2; justify-content:end; }
+    .top-links a { color:var(--blue); }
+    .auth { align-items:end; display:flex; gap:8px; grid-column:2; grid-row:2; justify-content:end; }
+    .auth label { font-size:12px; gap:3px; }
+    .auth input { min-height:42px; width:min(32vw,330px); }
+    .auth button { min-height:42px; white-space:nowrap; }
+    .auth .secondary { background:#e7f2fa; color:var(--navy); }
+    .auth .secondary:hover { background:var(--pale); }
+    .nav { background:var(--navy); color:white; display:flex; flex-wrap:wrap; gap:8px 32px; justify-content:center; padding:13px 20px; }
+    .nav a { color:white; text-decoration:none; }
+    .nav a:hover { text-decoration:underline; }
+    main { background:var(--surface); margin:10px auto 0; max-width:1290px; min-height:620px; padding:36px clamp(24px,5.3vw,72px) 72px; }
+    .intro { align-items:end; display:flex; gap:24px; justify-content:space-between; }
+    .eyebrow { color:var(--navy); font-size:13px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    h1 { font-size:clamp(32px,4vw,46px); font-weight:500; letter-spacing:-.025em; line-height:1.15; margin:8px 0 12px; }
+    .intro p { color:var(--muted); margin:0; max-width:680px; }
+    .status { align-items:center; color:var(--muted); display:flex; flex:0 0 auto; font-size:13px; gap:8px; }
+    .dot { background:#29824a; border-radius:99px; height:8px; width:8px; }
+    .layout { display:grid; gap:30px; grid-template-columns:minmax(0,1.6fr) minmax(0,.9fr); margin-top:34px; }
+    .panel { background:var(--surface); border:1px solid var(--line); }
+    .market { min-width:0; padding:22px; }
+    .panel-head { align-items:center; display:flex; justify-content:space-between; margin-bottom:20px; }
+    h2 { font-size:19px; letter-spacing:-.02em; margin:0; }
+    .count { background:var(--pale); color:var(--navy); font-size:12px; font-weight:700; padding:5px 10px; }
+    .listing-list { display:grid; gap:12px; }
+    .listing { align-items:center; border:1px solid var(--line); display:grid; gap:18px; grid-template-columns:minmax(0,1fr); min-width:0; padding:17px; }
+    .crop-line { align-items:baseline; display:flex; flex-wrap:wrap; gap:9px; }
+    .crop { font-size:17px; font-weight:720; text-transform:capitalize; }
+    .qty { color:var(--navy); font-size:14px; font-weight:700; }
+    .reserve { align-items:center; display:grid; gap:8px; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(90px,.65fr) auto; min-width:0; }
+    .reserve input { min-width:0; }
+    .reserve input { max-width:92px; }
+    .reserve input[name="buyer_name"],.reserve input[name="buyer_contact"] { max-width:130px; }
+    .operator-panel { margin-top:24px; padding:24px; }
+    .operator-head { align-items:center; display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; margin-bottom:16px; }
+    .reservation-list { display:grid; gap:10px; }
+    .reservation { align-items:center; border:1px solid var(--line); display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; min-width:0; padding:14px; }
+    .reservation-meta { color:var(--muted); font-size:13px; }
+    .reservation-actions { display:flex; flex-wrap:wrap; gap:8px; }
+    .reservation-actions .cancel { background:#f7ece6; color:#8d3515; }
+    input,select { background:#fff; border:1px solid #929da3; color:var(--ink); min-height:42px; padding:9px 11px; width:100%; }
+    input:focus,select:focus { border-color:var(--blue); outline:3px solid #005a9c33; }
+    button { background:var(--navy); border:0; color:white; cursor:pointer; font-weight:680; min-height:42px; padding:9px 14px; }
+    button:hover { background:#00324f; }
+    button:disabled { cursor:wait; opacity:.65; }
+    .form-panel { align-self:start; border-top:4px solid var(--navy); padding:23px; }
+    .form-panel p { color:var(--muted); font-size:14px; margin:7px 0 20px; }
+    form:not(.auth):not(.reserve) { display:grid; gap:14px; }
+    label { color:#333b40; display:grid; font-size:13px; font-weight:650; gap:6px; }
+    .two-col { display:grid; gap:10px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+    .submit { margin-top:3px; width:100%; }
+    .empty { border:1px dashed #aeb7bd; color:var(--muted); padding:28px 18px; text-align:center; }
+    .empty strong { color:var(--ink); display:block; margin-bottom:4px; }
+    .notice { display:none; font-size:14px; margin-bottom:16px; padding:10px 12px; }
+    .notice.show { display:block; }
+    .notice.error { background:#fff0e9; color:#8d3515; }
+    .notice.success { background:#e7f2fa; color:var(--navy); }
+    .site-footer { background:var(--navy); color:white; margin:10px auto 0; max-width:1290px; padding:34px clamp(24px,5.3vw,72px); }
+    .site-footer strong { display:block; margin-bottom:10px; }
+    .site-footer p { font-size:14px; margin:0; max-width:760px; }
+    footer { color:var(--muted); font-size:12px; margin:22px 2px 0; }
+    @media(min-width:1100px) { .listing { grid-template-columns:minmax(0,1fr) minmax(390px,1.15fr); } }
+    @media(max-width:900px) { .topbar { gap:12px 20px; grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr); padding-left:24px; padding-right:24px; } .auth input { width:min(30vw,280px); } .layout { grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:20px; } .reserve { grid-template-columns:repeat(2,minmax(0,1fr)); } .reserve button { width:100%; } }
+    @media(max-width:760px) { .topbar { grid-template-columns:1fr; } .brand { grid-row:1; } .top-links { grid-column:1; grid-row:2; justify-content:start; } .auth { grid-column:1; grid-row:3; justify-content:start; } .auth label { flex:1; } .auth input { width:100%; } .nav { justify-content:start; } main { padding-top:30px; } .layout { grid-template-columns:1fr; } .intro { align-items:start; flex-direction:column; } .status { padding-top:0; } .listing { grid-template-columns:minmax(0,1fr); } .reserve { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:480px) { body { font-size:15px; } .topbar { padding:14px 16px; } .brand { font-size:19px; } .nav { gap:6px 16px; padding:12px 16px; } .nav a { font-size:14px; } .auth { align-items:stretch; flex-wrap:wrap; justify-content:stretch; } .auth label { flex:1 1 100%; } .auth button { flex:1; } main { margin-top:6px; padding:24px 14px 44px; } h1 { font-size:clamp(30px,9vw,38px); } .layout { gap:16px; margin-top:24px; } .market,.form-panel,.operator-panel { padding:16px; } .panel-head { align-items:flex-start; gap:10px; } .listing { padding:13px; } .reserve { grid-template-columns:minmax(0,1fr); } .reserve button { width:100%; } .two-col { gap:8px; } .operator-panel { margin-top:16px; } .reservation-actions { width:100%; } .reservation-actions button { flex:1; } .site-footer { margin-top:6px; padding:24px 18px; } }
+    @media(max-width:340px) { .top-links { gap:4px 12px; } .two-col { grid-template-columns:minmax(0,1fr); } .market { padding:12px; } }
+  </style></head>
 <body>
   <header class="topbar">
+    <div class="top-links"><a href="#market-title">Les récoltes</a><a href="#listing-form">Proposer une récolte</a><a href="#support">Aide et contact</a></div>
     <div class="brand"><span class="brand-mark" aria-hidden="true">M</span><span>MabeleLink</span></div>
     <form class="auth" id="auth-form">
       <label for="api-token">Clé opérateur<input id="api-token" name="api_token" type="password" autocomplete="current-password" minlength="32" required></label>
@@ -155,6 +92,7 @@
       <button type="button" class="secondary" id="logout-button" hidden>Quitter</button>
     </form>
   </header>
+  <nav class="nav" aria-label="Navigation principale"><a href="#market-title">Offres agricoles</a><a href="#listing-form">Publier une récolte</a><a href="#support">Fonctionnement</a><a href="#support">Contacter la coopérative</a></nav>
   <main>
     <section class="intro" aria-labelledby="page-title">
       <div>
@@ -201,6 +139,7 @@
       <div class="reservation-list" id="reservation-list"></div>
     </section>
   </main>
+  <footer class="site-footer" id="support"><strong>MabeleLink · Coopérative agricole</strong><p>Un service de proximité pour mettre en relation les producteurs et les acheteurs. En cas de difficulté de connexion ou pour faire enregistrer une demande, contactez votre opérateur ou votre coopérative par téléphone.</p></footer>
   <script>
     const listNode = document.querySelector("#listing-list");
     const countNode = document.querySelector("#listing-count");
@@ -214,7 +153,8 @@
 
     function showNotice(message, isError = false) {
       noticeNode.textContent = message;
-      noticeNode.className = `notice show ${isError ? "error" : "success"}`;
+      noticeNode.className = 
+otice show ${isError ? "error" : "success"}`;
       window.setTimeout(() => noticeNode.classList.remove("show"), 4500);
     }
 
